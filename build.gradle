@@ -1,0 +1,143 @@
+import java.text.SimpleDateFormat
+
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '2.4.0'
+    id 'com.gradleup.shadow' version '9.4.2'
+    id 'java'
+    // Checkstyle and SpotBugs disabled for now — re-enable after Kotlin migration
+    // id 'checkstyle'
+    // id "com.github.spotbugs" version "6.5.6"
+}
+
+group = "io.github.moranyue.offlinesimplelogin"
+
+static def getTime() {
+    SimpleDateFormat sdf = new SimpleDateFormat("yyMMdd-HHmm")
+    sdf.setTimeZone(TimeZone.getTimeZone("UTC"))
+    return sdf.format(new Date()).toString()
+}
+
+// Set version to version property if supplied
+String shortVersion = null
+if (hasProperty('ver')) {
+    if (ver.charAt(0) == "v") {
+        shortVersion = ver.substring(1).toUpperCase()
+    } else {
+        shortVersion = ver.toUpperCase()
+    }
+}
+
+// If the tag includes "-RC-" or no tag is supplied, append "-SNAPSHOT"
+int rcIdx
+if (shortVersion == null || shortVersion == "") {
+    version = "0.1.0+26.1.2"
+} else if ((rcIdx = shortVersion.indexOf("-RC-")) != -1) {
+    version = shortVersion.substring(0, rcIdx) + "-SNAPSHOT"
+} else {
+    version = shortVersion
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+repositories {
+    maven {
+        name = 'papermc'
+        url = 'https://repo.papermc.io/repository/maven-public/'
+        content {
+            includeModule("io.papermc.paper", "paper-api")
+            includeModule("io.papermc", "paperlib")
+            includeModule("net.md-5", "bungeecord-chat")
+            includeGroup("io.papermc.adventure")
+        }
+    }
+
+    maven {
+        name = 'minecraft'
+        url = 'https://libraries.minecraft.net'
+        content {
+            includeModule("com.mojang", "brigadier")
+        }
+    }
+
+    mavenCentral()
+}
+
+configurations {
+    mockitoAgent
+}
+
+dependencies {
+    // Paper API
+    compileOnly 'io.papermc.paper:paper-api:26.1.2.build.69-stable'
+    implementation 'io.papermc:paperlib:1.0.8'
+
+    // Kotlin
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib'
+
+    // Database
+    implementation 'org.xerial:sqlite-jdbc:3.53.2.0'
+    implementation 'org.postgresql:postgresql:42.7.11'
+    implementation 'com.zaxxer:HikariCP:7.0.2'
+
+    // Argon2 password hashing
+    implementation 'de.mkammerer:argon2-jvm:2.12'
+
+    // Testing
+    testImplementation 'io.papermc.paper:paper-api:26.1.2.build.69-stable'
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.1.0'
+    testImplementation 'org.mockito:mockito-core:5.23.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.1.0'
+    mockitoAgent('org.mockito:mockito-core:5.23.0') { transitive = false }
+}
+
+test {
+    useJUnitPlatform()
+    jvmArgs "-javaagent:${configurations.mockitoAgent.asPath}"
+}
+
+processResources {
+    filesMatching("**/plugin.yml") {
+        expand ( NAME: rootProject.name, VERSION: version, PACKAGE: rootProject.group.toString() )
+    }
+}
+
+shadowJar {
+    archiveClassifier.set('')
+    mergeServiceFiles()
+    relocate 'io.papermc.lib', 'shadow.io.papermc.paperlib'
+    relocate 'com.zaxxer.hikari', 'io.github.moranyue.offlinesimplelogin.shadow.hikari'
+    relocate 'de.mkammerer.argon2', 'io.github.moranyue.offlinesimplelogin.shadow.argon2'
+
+    minimize {
+        exclude(dependency('org.xerial:sqlite-jdbc:.*'))
+        exclude(dependency('org.postgresql:postgresql:.*'))
+        exclude(dependency('com.zaxxer:HikariCP:.*'))
+        exclude(dependency('de.mkammerer:argon2-jvm:.*'))
+    }
+}
+
+// Disable jar and replace with shadowJar
+jar.enabled = false
+assemble.dependsOn(shadowJar)
+
+tasks.register('printProjectName') {
+    doLast {
+        println rootProject.name
+    }
+}
+
+tasks.register('release') {
+    dependsOn build
+
+    doLast {
+        if (!version.endsWith("-SNAPSHOT")) {
+            // Rename final JAR to trim off version information
+            shadowJar.archiveFile.get().getAsFile()
+                    .renameTo(layout.buildDirectory.get().toString() + File.separator + 'libs' + File.separator
+                            + rootProject.name + '.jar')
+        }
+    }
+}

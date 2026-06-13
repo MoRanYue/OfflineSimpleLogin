@@ -1,0 +1,50 @@
+main: io.github.moranyue.offlinesimplelogin.OfflineSimpleLogin
+name: OfflineSimpleLogin
+version: "${VERSION}"
+api-version: "1.21"
+folia-supported: true
+author: MoRanYue
+description: Offline-mode player registration and login plugin with Folia support
+
+commands:
+  register:
+    description: Register a new account
+    usage: /register <password> <confirm>
+    aliases: [reg]
+    permission: offlinesimplelogin.register
+  login:
+    description: Login to your account
+    usage: /login <password>
+    aliases: [l]
+    permission: offlinesimplelogin.login
+  logout:
+    description: Logout from your account
+    usage: /logout
+    permission: offlinesimplelogin.logout
+  changepassword:
+    description: Change your password
+    usage: /changepassword <old-password> <new-password>
+    aliases: [changepw, cpw]
+    permission: offlinesimplelogin.changepassword
+
+permissions:
+  offlinesimplelogin.register:
+    description: Allows registration
+    default: true
+  offlinesimplelogin.login:
+    description: Allows login
+    default: true
+  offlinesimplelogin.logout:
+    description: Allows logout
+    default: true
+  offlinesimplelogin.changepassword:
+    description: Allows changing password
+    default: true
+  offlinesimplelogin.admin:
+    description: Admin permission
+    default: op
+    children:
+      offlinesimplelogin.register: true
+      offlinesimplelogin.login: true
+      offlinesimplelogin.logout: true
+      offlinesimplelogin.changepassword: true

@@ -1,0 +1,104 @@
+# ── OfflineSimpleLogin Configuration ─────────────────────────────────────────
+# Offline-mode player registration and login plugin with Folia support
+# Compatible with LimitedOfflineModePaper (Netty-level offline login bypass)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Database Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+database:
+  # Database type: "sqlite" or "postgresql"
+  type: sqlite
+
+  # ── SQLite Settings ─────────────────────────────────────────────────────────
+  sqlite:
+    # Database file path (relative to plugin data folder)
+    file: "data/offline-simple-login.db"
+
+  # ── PostgreSQL Settings ─────────────────────────────────────────────────────
+  postgresql:
+    host: localhost
+    port: 5432
+    database: offlinesimplelogin
+    username: minecraft
+    password: ""
+    # Connection pool size
+    pool-size: 10
+    # Connection timeout (milliseconds)
+    connection-timeout: 5000
+    # Maximum connection lifetime (milliseconds)
+    max-lifetime: 1800000
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Argon2 Password Hashing Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+argon2:
+  # Salt length (bytes)
+  salt-length: 16
+  # Hash output length (bytes)
+  hash-length: 32
+  # Parallelism threads
+  parallelism: 1
+  # Memory cost (KB)
+  memory: 65536
+  # Iterations
+  iterations: 3
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Session Configuration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+session:
+  # Session timeout (seconds). Players must re-login after timeout.
+  timeout: 1800
+  # Enable IP-based auto-login (same IP auto-authenticates within timeout)
+  ip-auto-login: true
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Player Restrictions (applied to unauthenticated players)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+restrictions:
+  # Whether to show Title prompts on join (login/register prompts)
+  show-title: true
+  # Prevent movement
+  prevent-movement: true
+  # Prevent interaction (block breaking/placing, etc.)
+  prevent-interaction: true
+  # Prevent inventory operations
+  prevent-inventory: true
+  # Prevent chat messages
+  prevent-chat: true
+  # Prevent taking damage
+  prevent-damage: true
+  # Prevent dealing damage to others
+  prevent-dealing-damage: true
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Message Configuration (Adventure MiniMessage format)
+# Reference: https://docs.advntr.dev/minimessage/format.html
+# ═══════════════════════════════════════════════════════════════════════════════
+
+messages:
+  register-prompt: "<gold>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n<red>  ✦ Please <yellow>/register <password> <confirm><red> to create an account\n<gray>  Password must be at least 6 characters\n<gold>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  login-prompt: "<gold>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n<red>  ✦ Please <yellow>/login <password><red> to authenticate\n<gray>  Use /changepassword to change your password\n<gold>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  register-success: "<green>✔ Registration successful! You are now logged in"
+  login-success: "<green>✔ Login successful! Welcome back"
+  login-failed: "<red>✘ Incorrect password, please try again"
+  already-registered: "<red>✘ This account is already registered"
+  not-registered: "<red>✘ Account not registered. Please use /register first"
+  already-logged-in: "<green>✔ You are already logged in"
+  logout-success: "<green>✔ Logged out successfully"
+  password-changed: "<green>✔ Password changed successfully"
+  wrong-password: "<red>✘ Current password is incorrect"
+  session-expired: "<red>✘ Session expired, please login again"
+  password-too-short: "<red>✘ Password must be at least 6 characters"
+  passwords-do-not-match: "<red>✘ Passwords do not match"
+  same-password: "<red>✘ New password cannot be the same as old password"
+  invalid-username: "<red>✘ Invalid username"
+  player-only: "<red>✘ This command can only be used by players"
+  premium-rejected: "<red>✘ Premium players do not need to use this command"
+  error-occurred: "<red>✘ An error occurred: <message>"
+  login-title: "<red>Please Login"
+  login-subtitle: "<gray>/login <password>"
