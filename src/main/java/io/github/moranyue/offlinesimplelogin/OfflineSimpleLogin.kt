@@ -199,6 +199,17 @@ class OfflineSimpleLogin : JavaPlugin() {
 
     // ── Command executors ──────────────────────────────────────────────────
 
+    /**
+     * All /register, /login, and /changepassword commands execute Argon2id
+     * password hashing/verification which is intentionally CPU-intensive
+     * (default: 64MB memory, 3 iterations, ~1-3 seconds per call).
+     *
+     * To avoid blocking the server's main/global region thread, all
+     * password operations are offloaded to the async scheduler.
+     * The result is then scheduled back to the global region thread
+     * for sending messages to the player.
+     */
+
     private fun executeRegister(source: CommandSourceStack, ctx: com.mojang.brigadier.context.CommandContext<CommandSourceStack>): Int {
         val sender = source.sender
         if (sender !is Player) {
@@ -213,22 +224,29 @@ class OfflineSimpleLogin : JavaPlugin() {
             return 1
         }
         val ip = sender.address?.hostString ?: "unknown"
-        try {
-            val result = authManager.register(sender.name, password, ip)
-            sender.sendMessage(miniMessage.deserialize(
-                when (result.status) {
-                    AuthManager.AuthStatus.SUCCESS -> pluginConfig.message("register-success", "<green>Registration successful!")
-                    AuthManager.AuthStatus.ALREADY_REGISTERED -> pluginConfig.message("already-registered", "<red>Already registered")
-                    AuthManager.AuthStatus.PASSWORD_TOO_SHORT -> pluginConfig.message("password-too-short", "<red>Password too short")
-                    AuthManager.AuthStatus.INVALID_USERNAME -> pluginConfig.message("invalid-username", "<red>Invalid username")
-                    else -> pluginConfig.message("register-success", "<green>Registration successful!")
+        val playerName = sender.name
+        // ⚡ Run Argon2 hash on async thread to avoid blocking the server
+        scheduleAsyncTask {
+            try {
+                val result = authManager.register(playerName, password, ip)
+                scheduleGlobalTask {
+                    val msg = when (result.status) {
+                        AuthManager.AuthStatus.SUCCESS -> pluginConfig.message("register-success", "<green>Registration successful!")
+                        AuthManager.AuthStatus.ALREADY_REGISTERED -> pluginConfig.message("already-registered", "<red>Already registered")
+                        AuthManager.AuthStatus.PASSWORD_TOO_SHORT -> pluginConfig.message("password-too-short", "<red>Password too short")
+                        AuthManager.AuthStatus.INVALID_USERNAME -> pluginConfig.message("invalid-username", "<red>Invalid username")
+                        else -> pluginConfig.message("register-success", "<green>Registration successful!")
+                    }
+                    sender.sendMessage(miniMessage.deserialize(msg))
                 }
-            ))
-        } catch (e: Exception) {
-            logger.severe("Register error: ${e.message}")
-            sender.sendMessage(miniMessage.deserialize(
-                pluginConfig.message("error-occurred", "<red>An error occurred").replace("{message}", e.message ?: "unknown")
-            ))
+            } catch (e: Exception) {
+                logger.severe("Register error: ${e.message}")
+                scheduleGlobalTask {
+                    sender.sendMessage(miniMessage.deserialize(
+                        pluginConfig.message("error-occurred", "<red>An error occurred").replace("{message}", e.message ?: "unknown")
+                    ))
+                }
+            }
         }
         return Command.SINGLE_SUCCESS
     }
@@ -246,21 +264,28 @@ class OfflineSimpleLogin : JavaPlugin() {
             sender.sendMessage(miniMessage.deserialize(pluginConfig.message("already-logged-in", "<green>Already logged in")))
             return 1
         }
-        try {
-            val result = authManager.login(sender.name, password, ip)
-            sender.sendMessage(miniMessage.deserialize(
-                when (result.status) {
-                    AuthManager.AuthStatus.SUCCESS -> pluginConfig.message("login-success", "<green>Login successful!")
-                    AuthManager.AuthStatus.NOT_REGISTERED -> pluginConfig.message("not-registered", "<red>Not registered")
-                    AuthManager.AuthStatus.WRONG_PASSWORD -> pluginConfig.message("login-failed", "<red>Wrong password")
-                    else -> pluginConfig.message("login-failed", "<red>Login failed")
+        val playerName = sender.name
+        // ⚡ Run Argon2 verification on async thread to avoid blocking the server
+        scheduleAsyncTask {
+            try {
+                val result = authManager.login(playerName, password, ip)
+                scheduleGlobalTask {
+                    val msg = when (result.status) {
+                        AuthManager.AuthStatus.SUCCESS -> pluginConfig.message("login-success", "<green>Login successful!")
+                        AuthManager.AuthStatus.NOT_REGISTERED -> pluginConfig.message("not-registered", "<red>Not registered")
+                        AuthManager.AuthStatus.WRONG_PASSWORD -> pluginConfig.message("login-failed", "<red>Wrong password")
+                        else -> pluginConfig.message("login-failed", "<red>Login failed")
+                    }
+                    sender.sendMessage(miniMessage.deserialize(msg))
                 }
-            ))
-        } catch (e: Exception) {
-            logger.severe("Login error: ${e.message}")
-            sender.sendMessage(miniMessage.deserialize(
-                pluginConfig.message("error-occurred", "<red>An error occurred").replace("{message}", e.message ?: "unknown")
-            ))
+            } catch (e: Exception) {
+                logger.severe("Login error: ${e.message}")
+                scheduleGlobalTask {
+                    sender.sendMessage(miniMessage.deserialize(
+                        pluginConfig.message("error-occurred", "<red>An error occurred").replace("{message}", e.message ?: "unknown")
+                    ))
+                }
+            }
         }
         return Command.SINGLE_SUCCESS
     }
@@ -293,22 +318,29 @@ class OfflineSimpleLogin : JavaPlugin() {
         if (rejectPremium(sender)) return 1
         val oldPassword = ctx.getArgument("old", String::class.java)
         val newPassword = ctx.getArgument("new", String::class.java)
-        try {
-            val result = authManager.changePassword(sender.name, oldPassword, newPassword)
-            sender.sendMessage(miniMessage.deserialize(
-                when (result.status) {
-                    AuthManager.AuthStatus.SUCCESS -> pluginConfig.message("password-changed", "<green>Password changed!")
-                    AuthManager.AuthStatus.WRONG_PASSWORD -> pluginConfig.message("wrong-password", "<red>Current password is incorrect")
-                    AuthManager.AuthStatus.PASSWORD_TOO_SHORT -> pluginConfig.message("password-too-short", "<red>Password too short")
-                    AuthManager.AuthStatus.SAME_PASSWORD -> pluginConfig.message("same-password", "<red>New password cannot be the same as old")
-                    else -> pluginConfig.message("wrong-password", "<red>Password change failed")
+        val playerName = sender.name
+        // ⚡ Run Argon2 operations on async thread to avoid blocking the server
+        scheduleAsyncTask {
+            try {
+                val result = authManager.changePassword(playerName, oldPassword, newPassword)
+                scheduleGlobalTask {
+                    val msg = when (result.status) {
+                        AuthManager.AuthStatus.SUCCESS -> pluginConfig.message("password-changed", "<green>Password changed!")
+                        AuthManager.AuthStatus.WRONG_PASSWORD -> pluginConfig.message("wrong-password", "<red>Current password is incorrect")
+                        AuthManager.AuthStatus.PASSWORD_TOO_SHORT -> pluginConfig.message("password-too-short", "<red>Password too short")
+                        AuthManager.AuthStatus.SAME_PASSWORD -> pluginConfig.message("same-password", "<red>New password cannot be the same as old")
+                        else -> pluginConfig.message("wrong-password", "<red>Password change failed")
+                    }
+                    sender.sendMessage(miniMessage.deserialize(msg))
                 }
-            ))
-        } catch (e: Exception) {
-            logger.severe("ChangePassword error: ${e.message}")
-            sender.sendMessage(miniMessage.deserialize(
-                pluginConfig.message("error-occurred", "<red>An error occurred").replace("{message}", e.message ?: "unknown")
-            ))
+            } catch (e: Exception) {
+                logger.severe("ChangePassword error: ${e.message}")
+                scheduleGlobalTask {
+                    sender.sendMessage(miniMessage.deserialize(
+                        pluginConfig.message("error-occurred", "<red>An error occurred").replace("{message}", e.message ?: "unknown")
+                    ))
+                }
+            }
         }
         return Command.SINGLE_SUCCESS
     }

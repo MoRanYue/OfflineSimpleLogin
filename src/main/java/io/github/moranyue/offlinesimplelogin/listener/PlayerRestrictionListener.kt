@@ -24,6 +24,9 @@ import org.bukkit.event.player.PlayerMoveEvent
  * Premium (online-mode) players are always exempt from restrictions.
  * All checks are fast in-memory lookups via SessionManager.
  * Configurable via the restrictions section in config.yml.
+ *
+ * Includes a short-lived authentication cache (500ms TTL) to avoid redundant
+ * lookups on high-frequency events like PlayerMoveEvent.
  */
 class PlayerRestrictionListener(
     private val plugin: OfflineSimpleLogin
@@ -43,18 +46,45 @@ class PlayerRestrictionListener(
         "/changepassword", "/changepw", "/cpw"
     )
 
+    // ── Authentication cache ──────────────────────────────────────────────
+    //
+    // Prevents repeated isAuthenticated() calls on high-frequency events
+    // (e.g., PlayerMoveEvent fires multiple times per second per player).
+    // Cache entries expire after 500ms.
+    private val authCache = mutableMapOf<String, AuthCacheEntry>()
+    private val cacheTtlMs = 500L
+
+    private data class AuthCacheEntry(val authenticated: Boolean, val timestamp: Long)
+
     /**
      * Check if a player is either:
      * 1. A premium (Mojang-authenticated) player — always authenticated
      * 2. An offline-mode player with a valid session
+     *
+     * Uses a short-lived cache to avoid redundant lookups on high-frequency events.
      */
     private fun isAuthenticated(player: Player): Boolean {
+        val name = player.name
+        val now = System.currentTimeMillis()
+
+        // Check cache
+        authCache[name]?.let { entry ->
+            if (now - entry.timestamp < cacheTtlMs) {
+                return entry.authenticated
+            }
+        }
+
         // Premium players are always authenticated
-        if (loginListener.isPremiumPlayer(player)) return true
+        if (loginListener.isPremiumPlayer(player)) {
+            authCache[name] = AuthCacheEntry(true, now)
+            return true
+        }
 
         // Offline-mode players need a valid session
         val ip = player.address?.hostString ?: "unknown"
-        return authManager.isAuthenticated(player.name, ip)
+        val result = authManager.isAuthenticated(player.name, ip)
+        authCache[name] = AuthCacheEntry(result, now)
+        return result
     }
 
     // ── Movement ────────────────────────────────────────────────────────────
