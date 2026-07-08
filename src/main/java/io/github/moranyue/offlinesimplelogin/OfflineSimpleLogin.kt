@@ -16,6 +16,8 @@ import io.papermc.paper.command.brigadier.Commands
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
@@ -181,9 +183,20 @@ class OfflineSimpleLogin : JavaPlugin() {
 
     // ── Premium player check ──────────────────────────────────────────────
 
-    /** Checks if a player authenticated via Mojang (online-mode). */
+    /**
+     * Checks if a player authenticated via Mojang (online-mode).
+     *
+     * Compares the player's UUID against the computed offline-mode UUID:
+     *   offlineUuid = UUID.nameUUIDFromBytes("OfflinePlayer:" + playerName)
+     *
+     * If the player's UUID matches the offline UUID, the player joined in offline mode.
+     * Premium (Mojang-authenticated) players have a UUID from Mojang's auth server.
+     */
     private fun isPremiumPlayer(player: Player): Boolean {
-        return player.playerProfile.properties.any { it.name == "textures" }
+        val offlineUuid = UUID.nameUUIDFromBytes(
+            ("OfflinePlayer:" + player.name).toByteArray(StandardCharsets.UTF_8)
+        )
+        return player.uniqueId != offlineUuid
     }
 
     /** Rejects the command if the sender is a premium player. Returns true if rejected. */

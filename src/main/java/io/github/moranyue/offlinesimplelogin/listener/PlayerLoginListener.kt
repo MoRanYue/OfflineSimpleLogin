@@ -10,7 +10,9 @@ import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import java.nio.charset.StandardCharsets
 import java.time.Duration
+import java.util.UUID
 
 /**
  * Listens for player join/quit events and manages authentication state.
@@ -21,8 +23,9 @@ import java.time.Duration
  * - Offline-mode players registered but not logged in are shown the login prompt.
  * - Offline-mode players not registered are shown the registration prompt.
  *
- * Premium detection: checks for the "textures" property in the player's GameProfile,
- * which is only present for Mojang-authenticated (online-mode) accounts.
+ * Premium detection: compares the player's UUID against the computed offline-mode UUID
+ * (UUID.nameUUIDFromBytes("OfflinePlayer:" + username)). If they match, the player is
+ * offline-mode. Premium (Mojang-authenticated) players have a different UUID from Mojang.
  *
  * On quit:
  * - In-memory session is preserved for IP auto-login on reconnect.
@@ -81,12 +84,20 @@ class PlayerLoginListener(
     /**
      * Detects whether a player authenticated through Mojang's servers (premium).
      *
-     * Checks for the "textures" property in the GameProfile, which is only
-     * present for Mojang-authenticated accounts. Offline-mode players injected
-     * by LimitedOfflineModePaper lack this property.
+     * Compares the player's UUID against the computed offline-mode UUID:
+     *   offlineUuid = UUID.nameUUIDFromBytes("OfflinePlayer:" + playerName)
+     *
+     * If the player's UUID matches the offline UUID, the player joined in offline mode.
+     * Premium (Mojang-authenticated) players have a UUID from Mojang's auth server,
+     * which will NOT match the offline UUID.
+     *
+     * @return true if the player is premium (online-mode), false if offline-mode
      */
     fun isPremiumPlayer(player: Player): Boolean {
-        return player.playerProfile.properties.any { it.name == "textures" }
+        val offlineUuid = UUID.nameUUIDFromBytes(
+            ("OfflinePlayer:" + player.name).toByteArray(StandardCharsets.UTF_8)
+        )
+        return player.uniqueId != offlineUuid
     }
 
     private fun showLoginPrompt(player: Player) {
@@ -97,7 +108,6 @@ class PlayerLoginListener(
             messages["login-prompt"] ?: "<red>Please /login <password>"
         ))
 
-        // Show/Hide Title based on config
         if (config.showTitle) {
             player.showTitle(Title.title(
                 plugin.miniMessage.deserialize(messages["login-title"] ?: "<red>Please Login"),
@@ -115,7 +125,6 @@ class PlayerLoginListener(
             messages["register-prompt"] ?: "<red>Please /register <password> <confirm>"
         ))
 
-        // Show/Hide Title based on config
         if (config.showTitle) {
             player.showTitle(Title.title(
                 plugin.miniMessage.deserialize(messages["register-title"] ?: "<red>Please Register"),
