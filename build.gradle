@@ -30,7 +30,7 @@ if (hasProperty('ver')) {
 // If the tag includes "-RC-" or no tag is supplied, append "-SNAPSHOT"
 int rcIdx
 if (shortVersion == null || shortVersion == "") {
-    version = "0.1.0+26.1.2"
+    version = "0.1.0+26.3"
 } else if ((rcIdx = shortVersion.indexOf("-RC-")) != -1) {
     version = shortVersion.substring(0, rcIdx) + "-SNAPSHOT"
 } else {
@@ -71,7 +71,7 @@ configurations {
 
 dependencies {
     // Paper API
-    compileOnly 'io.papermc.paper:paper-api:26.1.2.build.69-stable'
+    compileOnly 'io.papermc.paper:paper-api:26.3.build.230-stable'
     implementation 'io.papermc:paperlib:1.0.8'
 
     // Kotlin
@@ -86,7 +86,7 @@ dependencies {
     implementation 'de.mkammerer:argon2-jvm:2.12'
 
     // Testing
-    testImplementation 'io.papermc.paper:paper-api:26.1.2.build.69-stable'
+    testImplementation 'io.papermc.paper:paper-api:26.3.build.230-stable'
     testImplementation 'org.junit.jupiter:junit-jupiter:6.1.0'
     testImplementation 'org.mockito:mockito-core:5.23.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.1.0'
